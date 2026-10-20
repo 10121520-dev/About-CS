@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+  <!-- This code was created by Gemini A.I. -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetTrace - Interactive Packet Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            50: '#f0fdfa',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Glowing effects for nodes */
+        .glow-cyan {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+        }
+        .glow-purple {
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+        }
+
+        /* Pulse animation for active packets */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.15); opacity: 0.4; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .pulse-ring {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen bg-slate-950 text-slate-100 overflow-x-hidden selection:bg-cyan-500 selection:text-slate-950">
+
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
+                    <i class="fa-solid font-bold fa-network-wired text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+                        NetTrace
+                    </h1>
+                    <p class="text-xs text-slate-400">Interactive Internet Packet Visualizer</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3 text-xs sm:text-sm">
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-2"></span>
+                    Network Active
+                </span>
+                <button id="reset-btn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-right text-xs"></i> Reset Simulation
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="border-b border-slate-800/80 bg-slate-900/40 px-4 py-2 text-xs">
+        <div class="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto gap-4 scrollbar-none">
+            <div class="flex items-center space-x-2 shrink-0">
+                <span class="text-slate-400 font-medium uppercase tracking-wider text-[10px] mr-1">Presets:</span>
+                <button data-preset="http" class="preset-btn active px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-medium hover:bg-cyan-500/30 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-globe"></i> HTTP Request (GET)
+                </button>
+                <button data-preset="https" class="preset-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-lock text-emerald-400"></i> HTTPS (TLS Encrypted)
+                </button>
+                <button data-preset="dns" class="preset-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-server text-amber-400"></i> DNS Lookup (UDP)
+                </button>
+                <button data-preset="ping" class="preset-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-satellite-dish text-purple-400"></i> ICMP Ping
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-4 shrink-0 text-slate-400">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <span class="text-xs">Speed:</span>
+                    <input type="range" id="speed-range" min="1" max="5" value="3" class="w-20 accent-cyan-400 cursor-pointer">
+                </label>
+                <label class="flex items-center space-x-1.5 cursor-pointer text-xs">
+                    <input type="checkbox" id="drop-packet-chk" class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-cyan-500/20">
+                    <span>Simulate Packet Loss</span>
+                </label>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Visual Map & Controls (8 cols) -->
+        <section class="lg:col-span-8 flex flex-col gap-6">
+
+            <!-- Network Topology Visualizer Canvas Card -->
+            <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 relative overflow-hidden shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-route text-cyan-400"></i> Internet Route Topology
+                        </h2>
+                        <p class="text-xs text-slate-400">Observe data packets traversing routers, DNS, switches, and firewalls</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="simulation-status" class="text-xs font-mono px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                            Status: Ready
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Canvas Wrapper with interactive SVG lines & node icons -->
+                <div id="topology-container" class="relative w-full h-[320px] bg-slate-950/80 rounded-xl border border-slate-800/80 overflow-hidden">
+                    <!-- SVG lines connecting nodes dynamically -->
+                    <svg id="network-lines" class="absolute inset-0 w-full h-full pointer-events-none z-0">
+                        <defs>
+                            <linearGradient id="line-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.4" />
+                                <stop offset="50%" stop-color="#6366f1" stop-opacity="0.6" />
+                                <stop offset="100%" stop-color="#10b981" stop-opacity="0.4" />
+                            </linearGradient>
+                        </defs>
+                        <!-- Dynamic SVG Paths will be rendered via JS -->
+                    </svg>
+
+                    <!-- Network Nodes HTML Elements -->
+                    <div id="nodes-layer" class="absolute inset-0 z-10 p-4">
+                        <!-- Client Laptop -->
+                        <div id="node-client" data-node="client" class="node-item absolute left-[6%] top-[35%] -translate-y-1/2 flex flex-col items-center cursor-pointer group">
+                            <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-slate-800 border-2 border-cyan-500/80 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition shadow-lg shadow-cyan-500/10">
+                                <i class="fa-solid fa-laptop text-lg sm:text-xl"></i>
+                            </div>
+                            <span class="text-[11px] font-semibold mt-2 text-slate-200">Your Browser</span>
+                            <span class="text-[10px] font-mono text-cyan-400/80">192.168.1.105</span>
+                        </div>
+
+                        <!-- Home Router -->
+                        <div id="node-router" data-node="router" class="node-item absolute left-[28%] top-[20%] -translate-y-1/2 flex flex-col items-center cursor-pointer group">
+                            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-800 border-2 border-slate-600 flex items-center justify-center text-slate-300 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-wifi text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-semibold mt-2 text-slate-300">Local Router</span>
+                            <span class="text-[10px] font-mono text-slate-400">192.168.1.1</span>
+                        </div>
+
+                        <!-- ISP Gateway -->
+                        <div id="node-isp" data-node="isp" class="node-item absolute left-[48%] top-[30%] -translate-y-1/2 flex flex-col items-center cursor-pointer group">
+                            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-800 border-2 border-indigo-500/80 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-tower-cell text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-semibold mt-2 text-slate-300">ISP Gateway</span>
+                            <span class="text-[10px] font-mono text-slate-400">203.0.113.1</span>
+                        </div>
+
+                        <!-- DNS Server -->
+                        <div id="node-dns" data-node="dns" class="node-item absolute left-[48%] top-[72%] -translate-y-1/2 flex flex-col items-center cursor-pointer group">
+                            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-800 border-2 border-amber-500/80 flex items-center justify-center text-amber-400 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-server text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-semibold mt-1 text-slate-300">DNS Server</span>
+                            <span class="text-[10px] font-mono text-amber-400/80">8.8.8.8</span>
+                        </div>
+
+                        <!-- Core Internet Backbone Router -->
+                        <div id="node-core" data-node="core" class="node-item absolute left-[68%] top-[45%] -translate-y-1/2 flex flex-col items-center cursor-pointer group">
+                            <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-slate-800 border-2 border-purple-500/80 flex items-center justify-center text-purple-400 group-hover:scale-110 transition">
+                                <i class="fa-solid fa-diagram-project text-base"></i>
+                            </div>
+                            <span class="text-[11px] font-semibold mt-2 text-slate-300">BGP Router</span>
+                            <span class="text-[10px] font-mono text-slate-400">198.51.100.45</span>
+                        </div>
+
+                        <!-- Target Web Server -->
+                        <div id="node-server" data-node="server" class="node-item absolute left-[88%] top-[35%] -translate-y-1/2 flex flex-col items-center cursor-pointer group">
+                            <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-slate-800 border-2 border-emerald-500/80 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition shadow-lg shadow-emerald-500/10">
+                                <i class="fa-solid fa-database text-lg sm:text-xl"></i>
+                            </div>
+                            <span class="text-[11px] font-semibold mt-2 text-slate-200">Web Server</span>
+                            <span class="text-[10px] font-mono text-emerald-400/80">142.250.190.46</span>
+                        </div>
+                    </div>
+
+                    <!-- Animated Packet Element (Position updated dynamically by JS) -->
+                    <div id="animated-packet" class="absolute hidden top-0 left-0 z-30 pointer-events-none transition-all duration-75 flex flex-col items-center">
+                        <div class="w-7 h-7 rounded-full bg-cyan-400 border-2 border-white shadow-lg shadow-cyan-400/50 flex items-center justify-center text-slate-950 font-bold text-xs pulse-ring">
+                            <i id="packet-icon" class="fa-solid fa-envelope"></i>
+                        </div>
+                        <span id="packet-label" class="mt-1 px-1.5 py-0.5 rounded bg-slate-900/90 text-cyan-300 text-[9px] font-mono border border-cyan-500/30 whitespace-nowrap shadow">
+                            HTTP GET
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Control Buttons Bar -->
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 bg-slate-950/40 p-3 rounded-xl border border-slate-800">
+                    <div class="flex items-center space-x-2">
+                        <button id="send-btn" class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-semibold text-xs sm:text-sm shadow-md shadow-cyan-500/20 transition flex items-center gap-2 active:scale-95">
+                            <i class="fa-solid fa-paper-plane"></i> Send Packet
+                        </button>
+                        <button id="step-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs sm:text-sm border border-slate-700 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-forward-step"></i> Step Hop
+                        </button>
+                    </div>
+
+                    <div class="flex items-center space-x-3 text-xs text-slate-400">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block"></span>
+                            <span>Client / Request</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span>
+                            <span>Server Response</span>
+                        </div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="font-semibold text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-layer-group text-indigo-400"></i> Packet Layer Encapsulation Inspector
+                        </h2>
+                        <p class="text-xs text-slate-400">Click headers to inspect field contents across the OSI / TCP-IP stack</p>
+                    </div>
+                    <span id="current-hop-indicator" class="text-xs text-indigo-300 font-mono bg-indigo-950/60 border border-indigo-800/60 px-2.5 py-1 rounded-lg">
+                        Layer 7: Application
+                    </span>
+                </div>
+
+                <!-- Layered Packet Breakdown Boxes -->
+                <div class="space-y-2.5">
+                    <!-- Layer 4: Application -->
+                    <div class="layer-card border border-cyan-500/30 bg-cyan-950/20 rounded-xl p-3 transition hover:border-cyan-400">
+                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleLayerDetails('app-details')">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-[10px] border border-cyan-500/30">L7 / L5</span>
+                                <span class="text-xs font-semibold text-cyan-200">Application Layer Payload</span>
+                            </div>
+                            <span id="app-proto-badge" class="text-[11px] font-mono text-cyan-400">HTTP / GET</span>
+                        </div>
+                        <div id="app-details" class="mt-2 text-xs font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-slate-300 break-all leading-relaxed">
+                            <span class="text-slate-500">Payload:</span> <span id="layer-payload-text">GET /index.html HTTP/1.1\r\nHost: example.com</span>
+                        </div>
+                    </div>
+
+                    <!-- Layer 3: Transport (TCP/UDP) -->
+                    <div class="layer-card border border-indigo-500/30 bg-indigo-950/20 rounded-xl p-3 transition hover:border-indigo-400">
+                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleLayerDetails('trans-details')">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] border border-indigo-500/30">L4</span>
+                                <span class="text-xs font-semibold text-indigo-200">Transport Header (TCP / UDP)</span>
+                            </div>
+                            <span id="trans-proto-badge" class="text-[11px] font-mono text-indigo-300">TCP (SYN/ACK)</span>
+                        </div>
+                        <div id="trans-details" class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                            <div><span class="text-slate-500">Src Port:</span> <span id="hdr-src-port" class="text-indigo-300">54122</span></div>
+                            <div><span class="text-slate-500">Dst Port:</span> <span id="hdr-dst-port" class="text-indigo-300">80</span></div>
+                            <div><span class="text-slate-500">Seq #:</span> <span id="hdr-seq" class="text-indigo-300">1029384</span></div>
+                            <div><span class="text-slate-500">Window:</span> <span class="text-indigo-300">65535</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Layer 2: Network (IP Header) -->
+                    <div class="layer-card border border-purple-500/30 bg-purple-950/20 rounded-xl p-3 transition hover:border-purple-400">
+                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleLayerDetails('net-details')">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-mono text-[10px] border border-purple-500/30">L3</span>
+                                <span class="text-xs font-semibold text-purple-200">Network Header (IPv4)</span>
+                            </div>
+                            <span class="text-[11px] font-mono text-purple-300">IP Packet</span>
+                        </div>
+                        <div id="net-details" class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                            <div><span class="text-slate-500">Src IP:</span> <span id="hdr-src-ip" class="text-purple-300">192.168.1.105</span></div>
+                            <div><span class="text-slate-500">Dst IP:</span> <span id="hdr-dst-ip" class="text-purple-300">142.250.190.46</span></div>
+                            <div><span class="text-slate-500">TTL:</span> <span id="hdr-ttl" class="text-amber-400 font-bold">64</span></div>
+                            <div><span class="text-slate-500">Checksum:</span> <span class="text-purple-300">0x8F2A</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Layer 1: Data Link / Physical (Ethernet Frame) -->
+                    <div class="layer-card border border-slate-700 bg-slate-950/40 rounded-xl p-3 transition hover:border-slate-600">
+                        <div class="flex justify-between items-center cursor-pointer" onclick="toggleLayerDetails('link-details')">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded bg-slate-700 text-slate-300 font-mono text-[10px]">L2 / L1</span>
+                                <span class="text-xs font-semibold text-slate-300">Data Link Frame (Ethernet / MAC)</span>
+                            </div>
+                            <span class="text-[11px] font-mono text-slate-400">Ethernet II</span>
+                        </div>
+                        <div id="link-details" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                            <div><span class="text-slate-500">Hop MAC Src:</span> <span id="hdr-mac-src" class="text-slate-300">00:1A:2B:3C:4D:5E</span></div>
+                            <div><span class="text-slate-500">Hop MAC Dst:</span> <span id="hdr-mac-dst" class="text-slate-300">70:81:05:A1:B2:C3</span></div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <!-- Right Column: Interactive Controls & Real-Time Console (4 cols) -->
+        <aside class="lg:col-span-4 flex flex-col gap-6">
+
+            <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+                <h3 class="font-semibold text-slate-200 text-sm mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-cyan-400"></i> Configure Custom Packet
+                </h3>
+
+                <form id="packet-config-form" onsubmit="return false;" class="space-y-3.5 text-xs">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Target Host / URL</label>
+                        <input type="text" id="cfg-url" value="example.com/api/data" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 code-font focus:outline-none focus:border-cyan-500">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-400 mb-1">Protocol</label>
+                            <select id="cfg-protocol" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-cyan-500">
+                                <option value="HTTP">HTTP (TCP:80)</option>
+                                <option value="HTTPS">HTTPS (TCP:443)</option>
+                                <option value="DNS">DNS (UDP:53)</option>
+                                <option value="PING">PING (ICMP)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Initial TTL</label>
+                            <input type="number" id="cfg-ttl" min="1" max="128" value="64" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 code-font focus:outline-none focus:border-cyan-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-400 mb-1">Custom Payload Body</label>
+                        <textarea id="cfg-payload" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 code-font focus:outline-none focus:border-cyan-500 resize-none">{"user_id": 4021, "action": "fetch"}</textarea>
+                    </div>
+
+                    <div class="pt-1">
+                        <button id="apply-cfg-btn" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 font-semibold rounded-xl border border-slate-700 transition">
+                            Apply Packet Configuration
+                        </button>
+                    </div>
+                </form>
+            </article>
+
+            <article class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl flex-1 flex flex-col min-h-[300px]">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-semibold text-slate-200 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-terminal text-emerald-400"></i> Route Trace Console
+                    </h3>
+                    <button id="clear-log-btn" class="text-[11px] text-slate-400 hover:text-slate-200">
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Scrollable Console Output -->
+                <div id="terminal-log" class="flex-1 bg-slate-950 rounded-xl p-3 border border-slate-800 code-font text-[11px] leading-relaxed overflow-y-auto max-h-[320px] space-y-1.5 text-slate-300">
+                    <div class="text-slate-500">// Ready to initiate packet tracer simulation...</div>
+                    <div class="text-slate-500">// Select a preset or click "Send Packet" to begin.</div>
+                </div>
+            </article>
+
+            <article id="node-info-card" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center space-x-3">
+                    <div id="info-icon" class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                        <i class="fa-solid fa-info"></i>
+                    </div>
+                    <div>
+                        <h4 id="info-title" class="font-semibold text-xs text-slate-200">Node Inspector</h4>
+                        <p id="info-desc" class="text-[11px] text-slate-400">Click any network node in the graph to view details.</p>
+                    </div>
+                </div>
+            </article>
+        </aside>
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-900/60 mt-auto py-4 text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-4">
+                <span><i class="fa-solid fa-shield-halved text-cyan-400 mr-1"></i> TCP/IP Protocol Stack</span>
+                <span><i class="fa-solid fa-arrows-split-up-and-left text-indigo-400 mr-1"></i> BGP Routing</span>
+                <span><i class="fa-solid fa-network-wired text-emerald-400 mr-1"></i> ARP & MAC Hops</span>
+            </div>
+            <div>
+                <span>NetTrace Simulator &bull; Interactive Educational Tool</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Configuration state
+        const state = {
+            currentPreset: 'http',
+            speed: 3,
+            simulateLoss: false,
+            isAnimating: false,
+            currentHopIndex: 0,
+            activePacket: null,
+            routePath: [],
+        };
+
+        // Node definitions
+        const nodes = {
+            client: { id: 'client', name: 'Browser Client', ip: '192.168.1.105', mac: '00:1A:2B:3C:4D:5E', role: 'Source host initiating HTTP/TCP requests.' },
+            router: { id: 'router', name: 'Home Router (NAT)', ip: '192.168.1.1', mac: '70:81:05:A1:B2:C3', role: 'Performs Network Address Translation (NAT) and routes to ISP.' },
+            isp: { id: 'isp', name: 'ISP Gateway Router', ip: '203.0.113.1', mac: 'AA:BB:CC:11:22:33', role: 'Assigns public IP and forwards traffic to internet backbones.' },
+            dns: { id: 'dns', name: 'DNS Resolver Server', ip: '8.8.8.8', mac: '44:55:66:77:88:99', role: 'Resolves domain names (e.g. example.com) to IP addresses.' },
+            core: { id: 'core', name: 'Core BGP Router', ip: '198.51.100.45', mac: 'DD:EE:FF:00:11:22', role: 'High-speed internet backbone router directing AS autonomous routes.' },
+            server: { id: 'server', name: 'Target Web Server', ip: '142.250.190.46', mac: '00:11:22:33:44:55', role: 'Destination web server processing HTTP requests & returning responses.' }
+        };
+
+        // Presets data setup
+        const PRESETS = {
+            http: {
+                protocol: 'HTTP',
+                url: 'http://example.com/index.html',
+                ttl: 64,
+                srcPort: 52140,
+                dstPort: 80,
+                payload: 'GET /index.html HTTP/1.1\r\nHost: example.com',
+                route: ['client', 'router', 'isp', 'core', 'server'],
+                responseRoute: ['server', 'core', 'isp', 'router', 'client'],
+                badge: 'HTTP GET'
+            },
+            https: {
+                protocol: 'HTTPS',
+                url: 'https://secure-bank.com/account',
+                ttl: 64,
+                srcPort: 58922,
+                dstPort: 443,
+                payload: 'Client Hello [TLS 1.3] AES-256 Encrypted Payload',
+                route: ['client', 'router', 'isp', 'core', 'server'],
+                responseRoute: ['server', 'core', 'isp', 'router', 'client'],
+                badge: 'TLS Encrypted'
+            },
+            dns: {
+                protocol: 'DNS',
+                url: 'dns://8.8.8.8/A/google.com',
+                ttl: 32,
+                srcPort: 61002,
+                dstPort: 53,
+                payload: 'Standard Query: A-Record for google.com?',
+                route: ['client', 'router', 'isp', 'dns'],
+                responseRoute: ['dns', 'isp', 'router', 'client'],
+                badge: 'DNS Query'
+            },
+            ping: {
+                protocol: 'ICMP',
+                url: 'ping 142.250.190.46',
+                ttl: 128,
+                srcPort: 0,
+                dstPort: 0,
+                payload: 'ECHO REQUEST (Ping payload 32 bytes data)',
+                route: ['client', 'router', 'isp', 'core', 'server'],
+                responseRoute: ['server', 'core', 'isp', 'router', 'client'],
+                badge: 'ICMP Echo'
+            }
+        };
+
+        const sendBtn = document.getElementById('send-btn');
+        const stepBtn = document.getElementById('step-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const speedRange = document.getElementById('speed-range');
+        const dropPacketChk = document.getElementById('drop-packet-chk');
+        const terminalLog = document.getElementById('terminal-log');
+        const animatedPacket = document.getElementById('animated-packet');
+        const packetLabel = document.getElementById('packet-label');
+        const packetIcon = document.getElementById('packet-icon');
+        const svgLines = document.getElementById('network-lines');
+
+        // Inspector fields
+        const hdrSrcIp = document.getElementById('hdr-src-ip');
+        const hdrDstIp = document.getElementById('hdr-dst-ip');
+        const hdrSrcPort = document.getElementById('hdr-src-port');
+        const hdrDstPort = document.getElementById('hdr-dst-port');
+        const hdrTtl = document.getElementById('hdr-ttl');
+        const hdrSeq = document.getElementById('hdr-seq');
+        const hdrMacSrc = document.getElementById('hdr-mac-src');
+        const hdrMacDst = document.getElementById('hdr-mac-dst');
+        const layerPayloadText = document.getElementById('layer-payload-text');
+        const appProtoBadge = document.getElementById('app-proto-badge');
+        const transProtoBadge = document.getElementById('trans-proto-badge');
+        const simulationStatus = document.getElementById('simulation-status');
+
+        function drawTopologyConnections() {
+            const container = document.getElementById('topology-container').getBoundingClientRect();
+            svgLines.innerHTML = ''; // Clear existing paths
+
+            const connections = [
+                ['client', 'router'],
+                ['router', 'isp'],
+                ['isp', 'dns'],
+                ['isp', 'core'],
+                ['core', 'server']
+            ];
+
+            connections.forEach(([srcId, dstId]) => {
+                const srcEl = document.getElementById(`node-${srcId}`);
+                const dstEl = document.getElementById(`node-${dstId}`);
+
+                if (!srcEl || !dstEl) return;
+
+                const srcRect = srcEl.getBoundingClientRect();
+                const dstRect = dstEl.getBoundingClientRect();
+
+                // Calculate relative center coordinates
+                const x1 = (srcRect.left + srcRect.width / 2) - container.left;
+                const y1 = (srcRect.top + srcRect.height / 2) - container.top;
+                const x2 = (dstRect.left + dstRect.width / 2) - container.left;
+                const y2 = (dstRect.top + dstRect.height / 2) - container.top;
+
+                // Create SVG line
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('stroke', 'rgba(51, 65, 85, 0.6)');
+                line.setAttribute('stroke-width', '2');
+                line.setAttribute('stroke-dasharray', '4 4');
+
+                svgLines.appendChild(line);
+            });
+        }
+
+        function logConsole(message, type = 'info') {
+            const entry = document.createElement('div');
+            const time = new Date().toLocaleTimeString().split(' ')[0];
+            
+            let colorClass = 'text-slate-300';
+            if (type === 'success') colorClass = 'text-emerald-400 font-semibold';
+            if (type === 'warn') colorClass = 'text-amber-400';
+            if (type === 'error') colorClass = 'text-rose-400 font-semibold';
+            if (type === 'packet') colorClass = 'text-cyan-300';
+
+            entry.className = `${colorClass} flex items-start gap-1.5`;
+            entry.innerHTML = `<span class="text-slate-600 select-none">[${time}]</span> <span>${message}</span>`;
+            
+            terminalLog.appendChild(entry);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+        }
+
+        function getNodeCenterPosition(nodeId) {
+            const container = document.getElementById('topology-container').getBoundingClientRect();
+            const nodeEl = document.getElementById(`node-${nodeId}`);
+            if (!nodeEl) return { x: 0, y: 0 };
+            
+            const rect = nodeEl.getBoundingClientRect();
+            return {
+                x: (rect.left + rect.width / 2) - container.left,
+                y: (rect.top + rect.height / 2) - container.top
+            };
+        }
+
+        function updateInspectorData(currentHopId, nextHopId, currentTTL) {
+            const activePreset = PRESETS[state.currentPreset];
+            const srcNode = nodes[currentHopId];
+            const dstNode = nextHopId ? nodes[nextHopId] : nodes[activePreset.route[activePreset.route.length - 1]];
+
+            hdrSrcIp.textContent = nodes[activePreset.route[0]].ip;
+            hdrDstIp.textContent = nodes[activePreset.route[activePreset.route.length - 1]].ip;
+            hdrSrcPort.textContent = activePreset.srcPort;
+            hdrDstPort.textContent = activePreset.dstPort;
+            hdrTtl.textContent = currentTTL;
+            
+            hdrMacSrc.textContent = srcNode.mac;
+            hdrMacDst.textContent = dstNode ? dstNode.mac : 'FF:FF:FF:FF:FF:FF';
+
+            document.getElementById('current-hop-indicator').textContent = `Node: ${srcNode.name}`;
+        }
+
+        function triggerPacketMovement(fromNodeId, toNodeId, onComplete) {
+            const startPos = getNodeCenterPosition(fromNodeId);
+            const endPos = getNodeCenterPosition(toNodeId);
+
+            animatedPacket.classList.remove('hidden');
+            
+            // Set start location
+            animatedPacket.style.left = `${startPos.x - 14}px`;
+            animatedPacket.style.top = `${startPos.y - 14}px`;
+
+            // Calculate duration based on speed slider
+            const durationMs = 1200 / state.speed;
+
+            // Trigger CSS animation translate
+            requestAnimationFrame(() => {
+                animatedPacket.style.transition = `all ${durationMs}ms cubic-bezier(0.4, 0, 0.2, 1)`;
+                animatedPacket.style.left = `${endPos.x - 14}px`;
+                animatedPacket.style.top = `${endPos.y - 14}px`;
+            });
+
+            setTimeout(() => {
+                if (onComplete) onComplete();
+            }, durationMs + 50);
+        }
+
+        async function runFullSimulation() {
+            if (state.isAnimating) return;
+
+            state.isAnimating = true;
+            sendBtn.disabled = true;
+            sendBtn.classList.add('opacity-50');
+            simulationStatus.textContent = 'Status: In Transit...';
+            simulationStatus.className = 'text-xs font-mono px-2.5 py-1 rounded-md bg-cyan-950 text-cyan-300 border border-cyan-700';
+
+            const activePreset = PRESETS[state.currentPreset];
+            const route = activePreset.route;
+            let ttl = activePreset.ttl;
+
+            logConsole(`Initiating ${activePreset.protocol} transmission to ${activePreset.url}...`, 'packet');
+            logConsole(`Source IP: ${nodes[route[0]].ip} -> Target IP: ${nodes[route[route.length - 1]].ip}`);
+
+            // Forward Path (Request)
+            for (let i = 0; i < route.length - 1; i++) {
+                const current = route[i];
+                const next = route[i + 1];
+
+                // Update Inspector details
+                updateInspectorData(current, next, ttl);
+
+                logConsole(`[Hop ${i + 1}] Processing at <b>${nodes[current].name}</b>. Forwarding to ${nodes[next].name}...`);
+
+                // Simulate packet loss check
+                if (state.simulateLoss && i === 2) {
+                    logConsole(`[ERROR] Packet dropped at ${nodes[current].name}! (Simulated Packet Loss)`, 'error');
+                    simulationStatus.textContent = 'Status: Packet Loss!';
+                    simulationStatus.className = 'text-xs font-mono px-2.5 py-1 rounded-md bg-rose-950 text-rose-300 border border-rose-800';
+                    state.isAnimating = false;
+                    sendBtn.disabled = false;
+                    sendBtn.classList.remove('opacity-50');
+                    return;
+                }
+
+                // Move packet
+                await new Promise(resolve => triggerPacketMovement(current, next, resolve));
+
+                ttl--; // Decrement TTL at each hop
+            }
+
+            // Packet reached target server!
+            const targetNode = route[route.length - 1];
+            logConsole(`Packet successfully delivered to <b>${nodes[targetNode].name}</b>! Processing payload...`, 'success');
+            
+            // Brief pause at server
+            await new Promise(r => setTimeout(r, 600));
+
+            // Return Path (Response)
+            packetLabel.textContent = 'ACK Response';
+            packetIcon.className = 'fa-solid fa-reply';
+            animatedPacket.firstElementChild.classList.replace('bg-cyan-400', 'bg-emerald-400');
+            animatedPacket.firstElementChild.classList.replace('shadow-cyan-400/50', 'shadow-emerald-400/50');
+
+            const respRoute = activePreset.responseRoute;
+            logConsole(`Generating HTTP 200 OK Response packet. Returning to client...`, 'packet');
+
+            for (let i = 0; i < respRoute.length - 1; i++) {
+                const current = respRoute[i];
+                const next = respRoute[i + 1];
+
+                updateInspectorData(current, next, ttl);
+                logConsole(`[Return Hop ${i + 1}] Response moving: ${nodes[current].name} &rarr; ${nodes[next].name}`);
+
+                await new Promise(resolve => triggerPacketMovement(current, next, resolve));
+                ttl--;
+            }
+
+            logConsole(`[SUCCESS] Response delivered back to Browser Client! Complete round-trip cycle.`, 'success');
+            
+            // Reset styles
+            simulationStatus.textContent = 'Status: Completed';
+            simulationStatus.className = 'text-xs font-mono px-2.5 py-1 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800';
+            
+            state.isAnimating = false;
+            sendBtn.disabled = false;
+            sendBtn.classList.remove('opacity-50');
+        }
+
+        function loadPreset(presetKey) {
+            state.currentPreset = presetKey;
+            const data = PRESETS[presetKey];
+
+            // Update UI buttons styling
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                if (btn.dataset.preset === presetKey) {
+                    btn.className = 'preset-btn active px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-medium transition flex items-center gap-1.5';
+                } else {
+                    btn.className = 'preset-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition flex items-center gap-1.5';
+                }
+            });
+
+            // Update configuration form
+            document.getElementById('cfg-url').value = data.url;
+            document.getElementById('cfg-protocol').value = data.protocol;
+            document.getElementById('cfg-ttl').value = data.ttl;
+            document.getElementById('cfg-payload').value = data.payload;
+
+            // Update packet icon and label
+            packetLabel.textContent = data.badge;
+            appProtoBadge.textContent = data.protocol;
+            transProtoBadge.textContent = data.protocol === 'DNS' ? 'UDP' : (data.protocol === 'ICMP' ? 'ICMP' : 'TCP');
+            layerPayloadText.textContent = data.payload;
+
+            // Reset packet position to Client
+            const clientPos = getNodeCenterPosition('client');
+            animatedPacket.style.transition = 'none';
+            animatedPacket.style.left = `${clientPos.x - 14}px`;
+            animatedPacket.style.top = `${clientPos.y - 14}px`;
+            animatedPacket.firstElementChild.className = 'w-7 h-7 rounded-full bg-cyan-400 border-2 border-white shadow-lg shadow-cyan-400/50 flex items-center justify-center text-slate-950 font-bold text-xs pulse-ring';
+
+            updateInspectorData('client', 'router', data.ttl);
+            logConsole(`Loaded preset: <b>${data.protocol} Request</b>`);
+        }
+
+        function toggleLayerDetails(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.toggle('hidden');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            drawTopologyConnections();
+            loadPreset('http');
+
+            // Handle window resize for dynamic canvas connections
+            window.addEventListener('resize', () => {
+                drawTopologyConnections();
+            });
+
+            // Preset button click handlers
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (!state.isAnimating) {
+                        loadPreset(btn.dataset.preset);
+                    }
+                });
+            });
+
+            // Action Buttons
+            sendBtn.addEventListener('click', runFullSimulation);
+
+            stepBtn.addEventListener('click', () => {
+                if (state.isAnimating) return;
+                logConsole(`Step Hop execution triggered manually.`, 'warn');
+                runFullSimulation();
+            });
+
+            resetBtn.addEventListener('click', () => {
+                state.isAnimating = false;
+                animatedPacket.classList.add('hidden');
+                simulationStatus.textContent = 'Status: Ready';
+                simulationStatus.className = 'text-xs font-mono px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700';
+                loadPreset(state.currentPreset);
+                logConsole(`Simulation state reset.`, 'info');
+            });
+
+            speedRange.addEventListener('input', (e) => {
+                state.speed = parseInt(e.target.value);
+            });
+
+            dropPacketChk.addEventListener('change', (e) => {
+                state.simulateLoss = e.target.checked;
+            });
+
+            document.getElementById('clear-log-btn').addEventListener('click', () => {
+                terminalLog.innerHTML = '<div class="text-slate-500">// Terminal log cleared.</div>';
+            });
+
+            // Node Inspector Click Interaction
+            document.querySelectorAll('.node-item').forEach(nodeEl => {
+                nodeEl.addEventListener('click', () => {
+                    const nodeKey = nodeEl.dataset.node;
+                    const nodeData = nodes[nodeKey];
+                    if (!nodeData) return;
+
+                    document.getElementById('info-title').textContent = `${nodeData.name} (${nodeData.ip})`;
+                    document.getElementById('info-desc').textContent = `${nodeData.role} MAC: ${nodeData.mac}`;
+                });
+            });
+
+            // Apply custom packet configuration
+            document.getElementById('apply-cfg-btn').addEventListener('click', () => {
+                const proto = document.getElementById('cfg-protocol').value;
+                const payload = document.getElementById('cfg-payload').value;
+                const ttl = parseInt(document.getElementById('cfg-ttl').value);
+
+                PRESETS[state.currentPreset].protocol = proto;
+                PRESETS[state.currentPreset].payload = payload;
+                PRESETS[state.currentPreset].ttl = ttl;
+
+                layerPayloadText.textContent = payload;
+                hdrTtl.textContent = ttl;
+                appProtoBadge.textContent = proto;
+
+                logConsole(`Custom packet settings applied successfully!`, 'success');
+            });
+        });
+    </script>
+</body>
+</html>
